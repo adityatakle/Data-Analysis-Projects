@@ -1,0 +1,625 @@
+Background
+In 2016, Cyclistic launched a successful bike-share offering. Since then, the program has grown to a fleet of 5,824 bicycles that are geotracked and locked into a network of 692 stations across Chicago. The bikes can be unlocked from one station and returned to any other station in the system anytime.
+
+I am a junior data analyst working on the marketing analyst team at a fictional company Cyclistic, a bike-share company in Chicago. I have been tasked to do analysis on comapany's bikeshare data to find insights and present them to the stakeholders.
+
+Ask Phase
+Question I am trying to find insights about:
+
+How do annual members and casual riders use Cyclistic bikes differently?
+Stakeholders of the insights from the data :
+
+Lily Moreno : Director of marketing and my manager. Responsible for development of campaigns and initiatives to promote the bike-share program.
+Expectations after the analysis:
+
+A clear statement of the business task
+A description of all data sources used
+Documentation of any cleaning or manipulation of data
+A summary of your analysis
+Supporting visualizations and key findings
+Top three recommendations based on analysis
+Further effects of the insights:
+
+Insights from this analysis will help company to make decisions on how to develop more effective campaigns by getting the insights about the customers.
+Prepare Phase
+Data is located at https://divvy-tripdata.s3.amazonaws.com/index.html
+
+Data is organised based on separate files monthwise and quarterwise. Data is credible at a larger extend as its provided by Google.
+
+For this analysis, I have selected 10 months of data from January 2024 to October 2024.
+
+# This R environment comes with many helpful analytics packages installed
+# It is defined by the kaggle/rstats Docker image: https://github.com/kaggle/docker-rstats
+# For example, here's a helpful package to load
+
+library(tidyverse) # metapackage of all tidyverse packages
+library(ggplot2)
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+list.files(path = "../input")
+
+# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+# Data is being imported using read_csv() function and stored in separate variables.
+
+jan <- read.csv("/kaggle/input/google-capestone-project-1-bikeshare-dataset/202401-divvy-tripdata.csv")
+feb <- read.csv("/kaggle/input/google-capestone-project-1-bikeshare-dataset/202402-divvy-tripdata.csv")
+march <- read.csv("/kaggle/input/google-capestone-project-1-bikeshare-dataset/202403-divvy-tripdata.csv")
+april <- read.csv("/kaggle/input/google-capestone-project-1-bikeshare-dataset/202404-divvy-tripdata.csv")
+may <- read.csv("/kaggle/input/google-capestone-project-1-bikeshare-dataset/202405-divvy-tripdata.csv")
+june <- read.csv("/kaggle/input/google-capestone-project-1-bikeshare-dataset/202406-divvy-tripdata.csv")
+july <- read.csv("/kaggle/input/google-capestone-project-1-bikeshare-dataset/202407-divvy-tripdata.csv")
+aug <- read.csv("/kaggle/input/google-capestone-project-1-bikeshare-dataset/202408-divvy-tripdata.csv")
+sept <- read.csv("/kaggle/input/google-capestone-project-1-bikeshare-dataset/202409-divvy-tripdata.csv")
+oct <- read.csv("/kaggle/input/google-capestone-project-1-bikeshare-dataset/202410-divvy-tripdata.csv")
+
+# Using str() function to look at the structure of variables and data in them.
+
+str(jan)
+str(feb)
+str(march)
+str(april)
+str(may)
+str(june)
+str(july)
+str(aug)
+str(sept)
+str(oct)
+All the data tables have same column names and number of columns and the datatypes so we can proceed to next phase of data analysis.
+
+Process Phase
+Here I am using R language for analysis due its incredible ability to work with huge data, its simplicity and R can be used from data cleaning to data visualizing phases. And it helps to keep the documentation easy due to use of only tool throughout th process.
+
+# We combined all variables containing tables in one large table using rbind() function.
+data <- rbind(jan, feb, march, april, may, june, july, aug, sept, oct)
+# Created new columns for weekday of when the ride started, month of start of ride and date of start of ride.
+# Created new column for ride length (in secs) and rounded it off to 2 decimal places to make the analysis more efficient.
+data$start_day <- weekdays(data$started_at)
+data$month <- month(data$started_at)
+data$date <- date(data$started_at)
+data$ride_length <- as.numeric(round(difftime(data$ended_at, data$started_at, unit = "mins"), 2))
+data$start_hour <- hour(data$started_at)
+# Lets check how many rides have negative or zero ride length
+
+data |>
+filter(
+    (ride_length) <= 0
+) |>
+count()
+
+data |>
+filter(
+    (ride_length > 0) & 
+    (ride_length < 1 )
+) |>
+count()
+There are 680 rows with negative or zero ride length and 122087 rows with ride length less than a minute (60 seconds). This may be due to the error or cancelling an ride just after starting the ride. We will delete these rows from our analysis.
+
+# We will work on ride length greater than 1 minute or 60 seconds.
+# We will update the data and delete the rows with less than a minute of ride length.
+data <- data |>
+filter(ride_length > 1)
+With this I have completed the processing phase of data. I have created new columns to make the further analysis more smoother and filtered out the ride length less than a minute to make analysis more efficient and result oriented.
+
+Analyze Phase
+In this phase lets analyze the data we have cleaned and processed in earlier phases.
+
+# Lets check how many rides are by member riders and how many by casual riders.
+rider <- data |>
+group_by(member_casual) |>
+summarize(count = n())  
+
+# Made a column for percentage of rider types
+rider$percent <- as.factor(round(rider$count / sum(rider$count) * 100, 1))
+
+
+# pie chart for total data.
+rider_pie <- ggplot(rider,
+       aes(x = "", y = count, fill = percent)) +
+    geom_bar(stat = "identity", 
+             show.legend = FALSE) +
+    coord_polar("y") +
+    theme_void() +
+    geom_text(
+        aes(label = paste0(percent, "%", "\n", member_casual)),
+              position = position_stack(vjust = 0.5)) +
+    labs(title = "Rider type percentage")
+# creating separate variable for members to make analysis efficient
+
+member_data <- data |>
+filter(member_casual == "member")
+
+# creating separate variable for casual to make analysis efficient
+
+casual_data <- data |>
+filter(member_casual == "casual")
+# finding mean and of data and rounding it to 2 decimal digits
+
+whole_data_mean <- paste("whole data mean =", round(mean(data$ride_length), 2), "mins")
+member_data_mean <- paste("member riders mean =", round(mean(member_data$ride_length), 2), "mins")
+casual_data_mean <- paste("casual riders mean =",round(mean(casual_data$ride_length), 2), "mins")
+
+
+# finding standard deviation and rounding it to 2 decimal digits.
+
+whole_data_sd <- paste("whole data standard deviation =", round(sd(data$ride_length), 2), "mins")
+member_data_sd <- paste("member riders standard deviation =", round(sd(member_data$ride_length), 2), "mins")
+casual_data_sd <- paste("casual data standard deviation =", round(sd(casual_data$ride_length), 2), "mins")
+# number of rides taken sorted by day of week - whole data
+total_rides_week_sorted <- data |>
+group_by(start_day) |>
+summarize(ride_count = n()) 
+
+# number of rides taken sorted by day of week - member data
+member_rides_week_sorted <- member_data |>
+group_by(start_day) |>
+summarize(ride_count = n()) |>
+mutate(ride_count_percent = round((ride_count / sum(ride_count)) * 100, 1))
+
+# number of rides taken sorted by day of week - casual data
+casual_rides_week_sorted <- casual_data |>
+group_by(start_day) |>
+summarize(ride_count = n()) |>
+mutate(ride_count_percent = round((ride_count / sum(ride_count)) * 100, 1))
+
+# Adding ride_count column from member_rides_week_sorted and casual_rides_week_sorted to total_rides_week_sorted for making plotting graph.
+total_rides_week_sorted$ride_count_member <- member_rides_week_sorted$ride_count
+total_rides_week_sorted$ride_count_casual <- casual_rides_week_sorted$ride_count
+
+# changing data type of start_day to keep the it in ordered way while plotting graph.
+total_rides_week_sorted <- total_rides_week_sorted  %>%
+  mutate(
+      start_day = factor(
+          start_day, 
+          levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+      )
+  )
+total_rides_week_sorted_graph <- ggplot(total_rides_week_sorted,
+       aes(x = start_day) 
+) +
+  # Column graph for total rides
+  geom_col(
+      aes(y = ride_count, fill = start_day),
+      show.legend = FALSE
+  ) +
+  scale_fill_viridis_d(
+      "Day OF Week"
+  ) +
+  scale_y_continuous(
+      limits = c(0, 900000)
+  ) +
+  theme_classic() +
+  labs(
+    x = "Day of Week",
+    y = "Ride Count",
+    title = "Count of Rides by Weekday"
+  ) +
+  # Points and line for ride_count_member
+  geom_point(
+      aes(y = ride_count_member, color = "Member"), 
+      size = 3
+  ) +
+  geom_line(
+      aes(y = ride_count_member, group = 1, color = "Member"),
+      linetype = 1
+  ) +
+  # Points and line for ride_count_casual
+  geom_point(
+      aes(y = ride_count_casual, color = "Casual"),
+      size = 3
+  ) +
+  geom_line(
+      aes(y = ride_count_casual, group = 1, color = "Casual"),
+      linetype = 1
+  ) +
+  # Custom color legend
+  scale_color_manual(
+    name = "Rider Type",
+    values = c("Member" = "cyan", "Casual" = "darkorange")
+  )
+# number of rides taken sorted by day of week - whole data
+
+total_ride_length_week_sorted <- data |>
+group_by(start_day) |>
+summarize(total_ride_length = sum(ride_length)) 
+
+# number of rides taken sorted by day of week - member data
+member_ride_length_week_sorted <- member_data |>
+group_by(start_day) |>
+summarize(ride_length = sum(ride_length)) 
+
+# number of rides taken sorted by day of week - casual data
+casual_ride_length_week_sorted <- casual_data |>
+group_by(start_day) |>
+summarize(ride_length = sum(ride_length) ) 
+
+# Adding columns to one tibble to make graph
+total_ride_length_week_sorted$ride_length_member <- member_ride_length_week_sorted$ride_length
+total_ride_length_week_sorted$ride_length_casual <- casual_ride_length_week_sorted$ride_length
+
+# changing data type of start_day to keep the it in ordered way while plotting graph.
+
+total_ride_length_week_sorted <- total_ride_length_week_sorted  %>%
+  mutate(
+      start_day = factor(
+          start_day,
+          levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+      )
+  )
+total_ride_length_week_sorted_graph <- ggplot(total_ride_length_week_sorted,
+       aes(x = start_day)
+      ) +
+  # Column graph for total ride length
+  geom_col(aes(y = total_ride_length, fill = start_day),
+           show.legend = FALSE
+          ) +
+  scale_fill_viridis_d("Day of Week") +
+  scale_y_continuous(
+      limits = c(0, 20000000)
+  ) +
+  theme_classic() +
+  labs(
+    x = "Day of Week",
+    y = "Ride Length",
+    title = "Ride length summed up by Weekday"
+  ) +
+  # Points and line for ride_length_member
+  geom_point(
+      aes(y = ride_length_member, color = "Member"),
+      size = 3
+  ) +
+  geom_line(
+      aes(y = ride_length_member,
+          group = 1, 
+          color = "Member"),
+      linetype = 1) +
+  # Points and line for ride_length_casual
+  geom_point(
+      aes(y = ride_length_casual, color = "Casual"),
+      size = 3
+  ) +
+  geom_line(
+      aes(y = ride_length_casual, group = 1, 
+          color = "Casual"),
+      linetype = 1
+  ) +
+  # Custom color legend
+  scale_color_manual(
+    name = "Rider Type",
+    values = c("Member" = "cyan",
+               "Casual" = "darkorange"
+              )
+  )
+# total bike types and their length summed up by casual riders.
+bike_data_length_casual <- data |>
+filter(member_casual == "casual") |>
+group_by(rideable_type) |>
+summarize(ride_length = sum(ride_length)) |>
+mutate( percent = round((ride_length / sum(ride_length)) * 100, 1))
+
+# total bike types and their length summed up by member riders.
+bike_data_length_member <- data |>
+filter(member_casual == "member") |>
+group_by(rideable_type) |>
+summarize(ride_length = sum(ride_length)) |>
+mutate(percent = round((ride_length / sum(ride_length)) * 100, 1))
+# pie chart for percentage of bike types used by Casual Riders
+bike_data_length_casual_pie <- ggplot(bike_data_length_casual,
+       aes(x = "", y = ride_length,
+           fill = percent)
+      ) +
+    
+    geom_bar(
+        stat = "identity",
+        show.legend = FALSE
+    ) +
+    scale_fill_viridis_b("") +
+    coord_polar("y") +
+    theme_void() +
+    geom_text(
+        aes(label = paste0(percent, "%", "\n", rideable_type)), # text inside pie chart as labels 
+        position = position_stack(vjust = 0.5), # position of text
+        size = 5 
+    ) +
+    labs(title = "Percentage of Bike type used by Casual riders")
+
+# pie chart for percentage of bike types used by Member Riders
+bike_data_length_member_pie <- ggplot(bike_data_length_member, 
+       aes(x = "", y = ride_length, fill = percent)
+      ) +
+    geom_bar(stat = "identity", 
+             show.legend = FALSE
+            ) +
+    scale_fill_viridis_c("") +
+    coord_polar("y") +
+    theme_void() +
+    geom_text(
+        aes(label = paste0(percent, "%", "\n", rideable_type)),  # text inside pie chart as labels 
+        position = position_stack(vjust = 0.5), # position of text
+        size = 5 
+    ) +
+    labs(title = "Percentage of Bike type used by Member riders ")
+# count of rides in a specific month - casual data
+casual_montly_rides_count <- casual_data |>
+    group_by(month) |>
+    summarize(count_casual = n()) 
+
+# count of rides in a specific month - member data
+member_montly_rides_count <- member_data |>
+    group_by(month) |>
+    summarize(count_member = n()) 
+
+# sum of ride length in a specific month - casual data
+casual_montly_rides_length <- casual_data |>
+group_by(month) |>
+summarize(ride_length_casual = sum(ride_length)) 
+
+# sum of ride length in a specific month - member data
+member_montly_rides_length <- member_data |>
+group_by(month) |>
+summarize(ride_length_member = sum(ride_length)) 
+
+# combining tibbles in one to make visualization
+total_monthly_summary <- tibble(
+    month = as.numeric(casual_montly_rides_count$month), 
+    count_casual = casual_montly_rides_count$count_casual , 
+    count_member = member_montly_rides_count$count_member,
+    ride_length_casual = casual_montly_rides_length$ride_length_casual,
+    ride_length_member = member_montly_rides_length$ride_length_member,
+    total_count = casual_montly_rides_count$count_casual + member_montly_rides_count$count_member,
+    total_length = casual_montly_rides_length$ride_length_casual + member_montly_rides_length$ride_length_member
+)
+
+# changing column data type to keep it in order in visualization
+total_monthly_summary <- total_monthly_summary %>%
+  mutate(month = factor(month, levels = as.character(month)))
+total_monthly_summary_ride_count_graph <- ggplot(
+    total_monthly_summary,
+    aes(x = month, y = total_count)
+) +
+# column graph for month vs total_count
+geom_col(
+    aes(fill = month),
+    show.legend = FALSE 
+) +
+scale_fill_viridis_d("Month") +
+scale_y_continuous(c(0, 810000 )) + # changing the scale of y axis as per need
+labs(
+    x = "Month",
+    y = "Ride Count",
+    title = "Ride Count per Month"
+) +
+# point graph for count_casual and line graph to connect the points
+geom_point(
+    aes(y = count_casual,color = "Casual"),
+    size = 2 
+) +
+geom_line(
+    aes(y = count_casual, group = 1, color = "Casual" ),
+    linetype = 1,
+    linewidth = 1 
+) +
+# point graph for count_member and line graph to connect the points
+geom_point(
+    aes(y = count_member, color = "Member"),
+    size = 2 
+) +
+geom_line(
+    aes(y = count_member, group = 1, color = "Member"),
+    linetype = 1,
+    linewidth = 1 
+) +
+ # Custom color legend
+  scale_color_manual(
+    name = "Rider Type",
+    values = c("Member" = "cyan", "Casual" = "white")
+  ) +
+theme_classic()
+
+
+
+total_monthly_summary_ride_length_graph <- ggplot(
+    total_monthly_summary,
+    aes(x = month, y = total_length ) 
+) +
+# column chart for month vs total_length
+geom_col(
+    aes(fill = month), 
+    show.legend = FALSE 
+) +
+scale_fill_viridis_d("Month") +
+scale_y_continuous(c(0, 15000000 )) +
+labs(
+    x = "Month",
+    y = "Ride Length",
+    title = "Ride Length per Month"
+) +
+# point graph for ride_length_casual and line graph to connect those points
+geom_point( 
+    aes(y = ride_length_casual, color = "Casual"),
+    size = 2 
+) +
+geom_line( 
+    aes(y = ride_length_casual, group = 1, color = "Casual" ),
+    linetype = 1,
+    linewidth = 1 
+) +
+# point graph for ride_length_member and line graph to connect those points
+geom_point( 
+    aes(y = ride_length_member, color = "Member"),
+    size = 2 
+) +
+geom_line( 
+    aes(y = ride_length_member, group = 1, color = "Member"),
+    linetype = 1,
+    linewidth = 1 
+) +
+ # Custom color legend
+  scale_color_manual(
+    name = "Rider Type",
+    values = c("Member" = "cyan", "Casual" = "white")
+  ) +
+theme_classic()
+# count of rides on a specific hour - member data
+member_hour_rides_count <- member_data |>
+group_by(start_hour) |>
+summarize(ride_count_member = n()) 
+
+# count of rides on a specific hour - casual data
+casual_hour_rides_count <- casual_data |>
+group_by(start_hour) |>
+summarize(ride_count_casual = n()) 
+
+# sum of ride length on a specific hour - member data
+member_hour_rides_length <- member_data |>
+group_by(start_hour) |>
+summarize(ride_length_sum_member = sum(ride_length)) 
+
+# sum of ride length on a specific hour - casual data
+casual_hour_rides_length <- casual_data |>
+group_by(start_hour) |>
+summarize(ride_length_sum_casual = sum(ride_length)) 
+
+
+# combining tibbles in one to make visualization
+total_hour_data <- tibble(
+    hour = member_hour_rides_count$start_hour,
+    ride_count_member = member_hour_rides_count$ride_count_member,
+    ride_count_casual = casual_hour_rides_count$ride_count_casual,
+    ride_length_member = member_hour_rides_length$ride_length_sum_member,
+    ride_length_casual = casual_hour_rides_length$ride_length_sum_casual
+
+)
+total_hour_data_ride_count_graph <- ggplot(total_hour_data, aes(x = hour)) +
+  geom_area(
+      aes(y = ride_count_member, fill = "Member"),
+      alpha = 0.5) +
+  geom_line(
+      aes(y = ride_count_member, color = "Member")) +
+  geom_area(
+      aes(y = ride_count_casual, fill = "Casual"),
+      alpha = 0.5) +
+  geom_line(
+      aes(y = ride_count_casual, color = "Casual")) +
+  theme_classic() +
+  labs(
+    x = "Hour of Day",
+    y = "Ride Count",
+    title = "Ride Count Grouped by Hour of Day",
+    fill = "Ride Type",  # Legend title for fill
+    color = "Ride Type"  # Legend title for line color
+  ) +
+  scale_fill_manual(values = c("Member" = "blue", "Casual" = "orange")) +  # Customize fill colors
+  scale_color_manual(values = c("Member" = "blue", "Casual" = "orange"))  # Customize line colors
+
+
+
+total_hour_data_ride_length_graph <- ggplot(total_hour_data, aes(x = hour)) +
+  geom_area(
+      aes(y = ride_length_casual, fill = "Casual"),
+      alpha = 0.7) +
+  geom_line(
+      aes(y = ride_length_casual, color = "Casual")) +
+  geom_area(
+      aes(y = ride_length_member, fill = "Member"),
+      alpha = 0.5) +
+  geom_line(
+      aes(y = ride_length_member, color = "Member")) +
+  theme_classic() +
+  labs(
+    x = "Hour of Day",
+    y = "Ride Length",
+    title = "Ride Length Grouped by Hour of Day",
+    fill = "Ride Type",  # Legend title for fill
+    color = "Ride Type"  # Legend title for line color
+  ) +
+  scale_fill_manual(values = c("Casual" = "orange", "Member" = "purple")) +  # Customize fill colors
+  scale_color_manual(values = c("Casual" = "orange", "Member" = "purple"))  # Customize line colors
+# total ride length from a specific start_station - member data
+member_start_station_ride_length <- member_data |>
+filter(start_station_name != "NA" | start_station_id != "NA" ) |> # removed NA values
+group_by(start_station_name) |>
+summarize(ride_length_member = sum(ride_length)) |>
+arrange(desc(ride_length_member)) |>
+head(10) # top 10 results
+
+# total ride length from a specific start_station - casual data 
+casual_start_station_ride_length <- casual_data |>
+filter(start_station_name != "NA" | start_station_id != "NA" ) |> # removed NA values
+group_by(start_station_name) |>
+summarize(ride_length_casual = sum(ride_length)) |>
+arrange(desc(ride_length_casual)) |>
+head(10) # top 10 results
+top_stations_ride_length_member <- ggplot(member_start_station_ride_length,
+       aes(x = ride_length_member,y = reorder(start_station_name, ride_length_member ))
+      ) +
+# column chart for start_station_name vs ride_length_member
+geom_col(
+    aes(fill = start_station_name),
+    show.legend = FALSE ) +
+scale_fill_viridis_d("Ride Length") +
+scale_x_continuous(
+    limits = c(0, 350000) ) +
+labs(
+    x = "Ride Length",
+    y = "Station Name",
+    title = "Top 10 stations by ride length by Member Riders"
+)
+top_stations_ride_length_casual <- ggplot(casual_start_station_ride_length, 
+       aes(x = ride_length_casual,y = reorder(start_station_name, ride_length_casual ))) +
+# column chart for start_station_name vs ride_length_casual
+geom_col( 
+    aes(fill = start_station_name), 
+    show.legend = FALSE ) +
+scale_fill_viridis_d("Ride Length") +
+scale_x_continuous(
+    limits = c(0, 2000000)
+) +
+labs(
+    x = "Ride Length",
+    y = "Station Name",
+    title = "Top 10 stations by ride length by Casual Riders"
+)
+i <- 0
+ride_length_chunk <- c("0 to 300 mins",
+                       "300 to 600 mins",
+                       "600 to 900 mins",
+                       "900 to 1200 mins",
+                       "1200 to 1500 mins",
+                       "1500 to 1800 mins"
+                      )
+
+ride_length_grouped <- tibble(ride_length_chunk)
+
+# creating empty variable which stores only numeric values as lists 
+count_ride_length_member <- as.numeric()
+count_ride_length_casual <- as.numeric()
+
+# while loop 
+while (i < 1800) {
+    j <- member_data |>
+        select(ride_length) |>
+        filter(ride_length > i &
+               ride_length < i + 300) |> # updating ride_length value using variable
+        count() |>
+        pull(n) # gets the value or ride_length
+    
+    k <- casual_data |>
+        select(ride_length) |>
+        filter(ride_length > i &
+               ride_length < i + 300) |> # updating ride_length value using variable
+        count() |>
+        pull(n) # gets the value or ride_length
+    
+        i <- i + 300 
+        # adding the variable value in variable while not deleting previous added values
+        count_ride_length_member <- c(count_ride_length_member, j) 
+        count_ride_length_casual <- c(count_ride_length_casual, k)
+    
+}
+# adding final variable to tibbles
+ride_length_grouped$count_member <- count_ride_length_member
+ride_length_grouped$count_casual <- count_ride_length_casual
+With above descriptive analysis on data we are done with Analyze phase. In this phase I made a descrpitive analysis of the data to get to know the overall story the data depicts.
